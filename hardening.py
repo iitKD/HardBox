@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import subprocess
+import sys
 def disable_filesystem_loading(l_mname):
     # Setting Module to be Not Loadable
     install_line = f"install {l_mname} /bin/false\n"
@@ -35,5 +36,34 @@ def disable_filesystem_loading(l_mname):
         with open(modprobe_conf_path, 'w') as f:
             print(f" - deny listing \"{l_mname}\"")
             f.write(blacklist_line)
+
+if __name__ == "__main__":
+    while True:
+        print("Select an option:")
+        print("1 to disable SquashFS")
+        print("2 to disable cramFs")
+        print("3 to disable udf")
+        print("4 to disable all 3")
+        print("Selcet 5 to exit")
+
+        try:
+            choice = int(input("Enter your choice:"))
+        except ValueError:
+            print("Invalid Choice please select from given options.")
+            continue
+
+        if choice==1:
+            disable_filesystem_loading("squashfs")
+        elif choice==2:
+            disable_filesystem_loading("cramfs")
+        elif choice==3:
+            disable_filesystem_loading("udf")
+        elif choice==4:
+            disable_filesystem_loading("squashfs")
+            disable_filesystem_loading("cramfs")
+            disable_filesystem_loading("udf")
+        elif choice==5:
+            print("Exiting...")
+            sys.exit(0)
 
 # the above function can be called for "cramfs", "squashfs" and "udf" for Ubuntu.
