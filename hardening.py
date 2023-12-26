@@ -18,9 +18,9 @@ def disable_filesystem_loading(l_mname):
             f.write(install_line)
 
 
-    if subprocess.Popen(["lsmod", "|", "grep", l_mname], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True).returncode == 0:
-        print(f" - unloading module \"{l_mname}\"")
-        subprocess.run(["modprobe", "-r", l_mname])
+    
+    print(f" - unloading module \"{l_mname}\"")
+    subprocess.run(["modprobe", "-r", l_mname])
 
 
     blacklist_line = f"blacklist {l_mname}\n"
