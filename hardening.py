@@ -24,7 +24,7 @@ def disable_filesystem_loading(l_mname):
         subprocess.run(["modprobe", "-r", l_mname])
 
     # Deny Listing the Module
-    blacklist_line = f"blacklist-{l_mname}\n"
+    blacklist_line = f"blacklist {l_mname}\n"
 
     try:
         with open("/etc/modprobe.d/*", 'r') as f:
