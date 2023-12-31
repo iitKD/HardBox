@@ -3,66 +3,81 @@
 import subprocess
 import sys
 def disable_filesystem_loading(l_mname):
-    install_line = f"install {l_mname} /bin/false\n"
-    modprobe_conf_path = f"/etc/modprobe.d/{l_mname}.conf"
-
-    try:
-        with open(modprobe_conf_path, 'r') as f:
-            if not any(install_line in line for line in f):
-                with open(modprobe_conf_path, 'a') as f:
-                    print(f" - setting module: \"{l_mname}\" to be not loadable")
-                    f.write(install_line)
-    except FileNotFoundError:
-        with open(modprobe_conf_path, 'w') as f:
-            print(f" - setting module: \"{l_mname}\" to be not loadable")
-            f.write(install_line)
-
-
-    
-    print(f" - unloading module \"{l_mname}\"")
-    subprocess.run(["modprobe", "-r", l_mname])
-
-
-    blacklist_line = f"blacklist {l_mname}\n"
-
-    
-    with open(modprobe_conf_path, 'r') as f:
-        if not any(blacklist_line in line for line in f):
-            with open(modprobe_conf_path, 'a') as f:
-                print(f" - deny listing \"{l_mname}\"")
-                f.write(blacklist_line)
-    # except FileNotFoundError:
-    #     with open(modprobe_conf_path, 'w') as f:
-    #         print(f" - deny listing \"{l_mname}\"")
-    #         f.write(blacklist_line)
-
-if __name__ == "__main__":
-    while True:
-        print("Select an option:")
-        print("1 to disable SquashFS")
-        print("2 to disable cramFs")
-        print("3 to disable udf")
-        print("4 to disable all 3")
-        print("Selcet 5 to exit")
+    fsList = ["squashfs", "cramfs", "udf", "usb-storage"]
+    for l_mname in fsList:
+        install_line = f"install {l_mname} /bin/false\n"
+        modprobe_conf_path = f"/etc/modprobe.d/{l_mname}.conf"
 
         try:
-            choice = int(input("Enter your choice:"))
-        except ValueError:
-            print("Invalid Choice please select from given options.")
-            continue
+            with open(modprobe_conf_path, 'r') as f:
+                if not any(install_line in line for line in f):
+                    with open(modprobe_conf_path, 'a') as f:
+                        print(f" - setting module: \"{l_mname}\" to be not loadable")
+                        f.write(install_line)
+        except FileNotFoundError:
+            with open(modprobe_conf_path, 'w') as f:
+                print(f" - setting module: \"{l_mname}\" to be not loadable")
+                f.write(install_line)
 
-        if choice==1:
-            disable_filesystem_loading("squashfs")
-        elif choice==2:
-            disable_filesystem_loading("cramfs")
-        elif choice==3:
-            disable_filesystem_loading("udf")
-        elif choice==4:
-            disable_filesystem_loading("squashfs")
-            disable_filesystem_loading("cramfs")
-            disable_filesystem_loading("udf")
-        elif choice==5:
-            print("Exiting...")
-            sys.exit(0)
 
-# the above function can be called for "cramfs", "squashfs" and "udf" for Ubuntu.
+        
+        print(f" - unloading module \"{l_mname}\"")
+        subprocess.run(["modprobe", "-r", l_mname])
+
+
+        blacklist_line = f"blacklist {l_mname}\n"
+
+        
+        with open(modprobe_conf_path, 'r') as f:
+            if not any(blacklist_line in line for line in f):
+                with open(modprobe_conf_path, 'a') as f:
+                    print(f" - deny listing \"{l_mname}\"")
+                    f.write(blacklist_line)
+def disable_autofs():
+    depRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
+    rdepRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
+
+    if "Depnds" in depRes.stdout or "Reverse Depends" in rdepRes.stdout:
+        subprocess.run(["system", "stop", "autofs"])
+        subprocess.run(["system", "mask", "autofs"])
+    else:
+        print("No dependencies found, uninstalling  autofs")
+        subprocess.run(["apt", "purge", "autofs"])
+def scheduling_side():
+    #/etc/systemd/system/aidecheck.service
+    servicePath = "aidecheck.service"
+    timerPath = "aidecheck.timer"
+    service_content = """[Unit]
+Description=Aide Check
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/aide.wrapper --config /etc/aide/aide.conf --check
+
+[Install]
+WantedBy=multi-user.target
+"""
+    timer_content = """[Unit]
+Description=Aide check every day at 5AM
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Unit=aidecheck.service
+
+[Install]
+WantedBy=multi-user.target
+"""
+    with open(servicePath, mode='w') as ServiceFile:
+        ServiceFile.write(service_content)
+    with open(timerPath, mode="w") as timerFile:
+        timerFile.write(timer_content)
+    subprocess.run(["chown", "root:root", "/etc/systemd/system/aidecheck.*"])
+    subprocess.run(["chmod", "0644", "/etc/systemd/system/aidecheck.*"])
+    subprocess.run(["systemctl", "daemon-reload"])
+    subprocess.run(["systemctl","enable"," aidecheck.service"])
+    subprocess.run(["systemctl","--now","enable","aidecheck.timer"])
+
+
+    
+    
+
