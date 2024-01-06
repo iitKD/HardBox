@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+#to remove, disable or uninstall unused filesystems
 def disable_filesystem_loading(l_mname):
     fsList = ["squashfs", "cramfs", "udf", "usb-storage"]
     for l_mname in fsList:
@@ -33,6 +34,8 @@ def disable_filesystem_loading(l_mname):
                 with open(modprobe_conf_path, 'a') as f:
                     print(f" - deny listing \"{l_mname}\"")
                     f.write(blacklist_line)
+
+#disabling automounting of file systems
 def disable_autofs():
     depRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
     rdepRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
@@ -43,20 +46,12 @@ def disable_autofs():
     else:
         print("No dependencies found, uninstalling  autofs")
         subprocess.run(["apt", "purge", "autofs"])
+#Periodic checking of the filesystem integrity to detect changes to the filesystem.
 def scheduling_side():
     #/etc/systemd/system/aidecheck.service
     servicePath = "aidecheck.service"
     timerPath = "aidecheck.timer"
-    service_content = """[Unit]
-Description=Aide Check
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/aide.wrapper --config /etc/aide/aide.conf --check
-
-[Install]
-WantedBy=multi-user.target
-"""
+    
     timer_content = """[Unit]
 Description=Aide check every day at 5AM
 
@@ -76,7 +71,7 @@ WantedBy=multi-user.target
     subprocess.run(["systemctl", "daemon-reload"])
     subprocess.run(["systemctl","enable"," aidecheck.service"])
     subprocess.run(["systemctl","--now","enable","aidecheck.timer"])
-
+vim 
 
     
     

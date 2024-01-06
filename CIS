@@ -1,0 +1,4 @@
+cat <<EOF 
+set superusers="<username>" 
+password_pbkdf2 <username> heheheheheh
+EOF
