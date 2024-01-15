@@ -6,5 +6,7 @@ ddhd hdhdhd hdhdhd hdhdhd hdhdhd
 tempfs /tmp tempfs defaults,nosuid,noexec,nodev 0 0
 ndddjd
 ndndndnd
-dndnd
+#*               hard    core            0
+# End of File
 /dev/sdb /var rt4 defaults,nosuid,noexec,nodev 0 0
+#kernel.randomize_va_space = 2
