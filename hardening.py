@@ -301,3 +301,11 @@ def disableLoginUserList():
         else:
             with open( gdmKeyFilePath,"w") as gdmKeyFile:
                 gdmKeyFile.write(gdmKeyfileContent)
+def screenLockIdle():
+    keyfilepath = "/etc/dconf/db/gdm.d/00-screensaver"
+    idleTime = "900"
+    lockTime = "5"
+    keyfileContent = f"""# Specify the dconf path\n[org/gnome/desktop/session]\n\n# Number of seconds of inactivity before the screen goes blank\n# Set to 0 seconds if you want to deactivate the screensaver.\nidle-delay = uint32 {idleTime}\n\n# Specify the dconf path\n[org/gnome/desktop/screensaver]\n\n# Number of seconds after the screen is blank before locking the screen\nlock-delay = unit32 {lockTime}"""
+    with open(keyfilepath,"w") as Screenfile:
+        Screenfile.write(keyfileContent)
+    os.system("dconf update")
