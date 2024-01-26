@@ -4,6 +4,7 @@
     l_pkgoutput=""
     l_output=""
     l_output2=""
+    l_gpname="local"  # Set to desired dconf profile name (default is local)
 
     # Check if GNOME Desktop Manager is installed. If package isn't installed, recommendation is Not Applicable
     # determine system's package manager
@@ -14,10 +15,11 @@
     fi
 
     # Check if GDM is installed
-    l_pcl="gdm gdm3" # Space-separated list of packages to check for
+    l_pcl="gdm gdm3"  # Space-separated list of packages to check for
     for l_pn in $l_pcl; do
         $l_pq "$l_pn" > /dev/null 2>&1 && l_pkgoutput="$l_pkgoutput\n - Package: \"$l_pn\" exists on the system\n - checking configuration"
     done
+    echo -e "$l_pkgoutput"
 
     # Check configuration (If applicable)
     if [ -n "$l_pkgoutput" ]; then
@@ -30,63 +32,66 @@
         # Set profile name based on dconf db directory ({PROFILE_NAME}.d)
         if [ -f "$l_kfile" ]; then
             l_gpname="$(awk -F\/ '{split($(NF-1),a,".");print a[1]}' <<< "$l_kfile")"
+            echo " - updating dconf profile name to \"$l_gpname\""
         elif [ -f "$l_kfile2" ]; then
             l_gpname="$(awk -F\/ '{split($(NF-1),a,".");print a[1]}' <<< "$l_kfile2")"
+            echo " - updating dconf profile name to \"$l_gpname\""
         fi
 
-        # If the profile name exists, continue checks
-        if [ -n "$l_gpname" ]; then
-            l_gpdir="/etc/dconf/db/$l_gpname.d"
+        # check for consistency (Clean up configuration if needed)
+        if [ -f "$l_kfile" ] && [ "$(awk -F\/ '{split($(NF-1),a,".");print a[1]}' <<< "$l_kfile")" != "$l_gpname" ]; then
+            sed -ri "/^\s*automount\s*=/s/^/# /" "$l_kfile"
+            l_kfile="/etc/dconf/db/$l_gpname.d/00-media-automount"
+        fi
 
-            # Check if profile file exists
-            if grep -Pq -- "^\h*system-db:$l_gpname\b" /etc/dconf/profile/*; then
-                l_output="$l_output\n - dconf database profile file \"$(grep -Pl -- "^\h*system-db:$l_gpname\b" /etc/dconf/profile/*)\" exists"
-            else
-                l_output2="$l_output2\n - dconf database profile isn't set"
-            fi
+        if [ -f "$l_kfile2" ] && [ "$(awk -F\/ '{split($(NF-1),a,".");print a[1]}' <<< "$l_kfile2")" != "$l_gpname" ]; then
+            sed -ri "/^\s*automount-open\s*=/s/^/# /" "$l_kfile2"
+        fi
 
-            # Check if the dconf database file exists
-            if [ -f "/etc/dconf/db/$l_gpname" ]; then
-                l_output="$l_output\n - The dconf database \"$l_gpname\" exists"
-            else
-                l_output2="$l_output2\n - The dconf database \"$l_gpname\" doesn't exist"
-            fi
+        [ -n "$l_kfile" ] && l_kfile="/etc/dconf/db/$l_gpname.d/00-media-automount"
 
-            # Check if the dconf database directory exists
-            if [ -d "$l_gpdir" ]; then
-                l_output="$l_output\n - The dconf directory \"$l_gpdir\" exists"
-            else
-                l_output2="$l_output2\n - The dconf directory \"$l_gpdir\" doesn't exist"
-            fi
-
-            # Check automount setting
-            if grep -Pqrs -- '^\h*automount\h*=\h*false\b' "$l_kfile"; then
-                l_output="$l_output\n - \"automount\" is set to false in: \"$l_kfile\""
-            else
-                l_output2="$l_output2\n - \"automount\" is not set correctly"
-            fi
-
-            # Check automount-open setting
-            if grep -Pqs -- '^\h*automount-open\h*=\h*false\b' "$l_kfile2"; then
-                l_output="$l_output\n - \"automount-open\" is set to false in: \"$l_kfile2\""
-            else
-                l_output2="$l_output2\n - \"automount-open\" is not set correctly"
-            fi
-
+        # Check if profile file exists
+        if grep -Pq -- "^\h*system-db:$l_gpname\b" /etc/dconf/profile/*; then
+            echo -e "\n - dconf database profile exists in: \"$(grep -Pl -- "^\h*system-db:$l_gpname\b" /etc/dconf/profile/*)\""
         else
-            # Settings don't exist. Nothing further to check
-            l_output2="$l_output2\n - neither \"automount\" or \"automount-open\" is set"
+            [ ! -f "/etc/dconf/profile/user" ] && l_gpfile="/etc/dconf/profile/user" || l_gpfile="/etc/dconf/profile/user2"
+            echo -e " - creating dconf database profile" {
+                echo -e "\nuser-db:user"
+                echo "system-db:$l_gpname"
+            } >> "$l_gpfile"
+        fi
+
+        # create dconf directory if it doesn't exist
+        l_gpdir="/etc/dconf/db/$l_gpname.d"
+        if [ -d "$l_gpdir" ]; then
+            echo " - The dconf database directory \"$l_gpdir\" exists"
+        else
+            echo " - creating dconf database directory \"$l_gpdir\""
+            mkdir "$l_gpdir"
+        fi
+
+        # check automount-open setting
+        if grep -Pqs -- '^\h*automount-open\h*=\h*false\b' "$l_kfile"; then
+            echo " - \"automount-open\" is set to false in: \"$l_kfile\""
+        else
+            echo " - creating \"automount-open\" entry in \"$l_kfile\""
+            ! grep -Psq -- '\^\h*\[org\/gnome\/desktop\/media-handling\]\b' "$l_kfile" && echo '[org/gnome/desktop/media-handling]' >> "$l_kfile"
+            sed -ri '/^\s*\[org\/gnome\/desktop\/media-handling\]/a \\nautomount-open=false' "$l_kfile"
+        fi
+
+        # check automount setting
+        if grep -Pqs -- '^\h*automount\h*=\h*false\b' "$l_kfile"; then
+            echo " - \"automount\" is set to false in: \"$l_kfile\""
+        else
+            echo " - creating \"automount\" entry in \"$l_kfile\""
+            ! grep -Psq -- '\^\h*\[org\/gnome\/desktop\/media-handling\]\b' "$l_kfile" && echo '[org/gnome/desktop/media-handling]' >> "$l_kfile"
+            sed -ri '/^\s*\[org\/gnome\/desktop\/media-handling\]/a \\nautomount=false' "$l_kfile"
         fi
 
     else
-        l_output="$l_output\n - GNOME Desktop Manager package is not installed on the system\n - Recommendation is not applicable"
+        echo -e "\n - GNOME Desktop Manager package is not installed on the system\n - Recommendation is not applicable"
     fi
 
-    # Report results. If no failures output in l_output2, we pass
-    if [ -z "$l_output2" ]; then
-        echo -e "\n- Audit Result:\n ** PASS **\n$l_output\n"
-    else
-        echo -e "\n- Audit Result:\n ** FAIL **\n - Reason(s) for audit failure:\n$l_output2\n"
-        [ -n "$l_output" ] && echo -e "\n- Correctly set:\n$l_output\n"
-    }
-
+    # update dconf database
+    dconf update
+}
