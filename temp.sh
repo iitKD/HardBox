@@ -55,7 +55,8 @@
             echo -e "\n - dconf database profile exists in: \"$(grep -Pl -- "^\h*system-db:$l_gpname\b" /etc/dconf/profile/*)\""
         else
             [ ! -f "/etc/dconf/profile/user" ] && l_gpfile="/etc/dconf/profile/user" || l_gpfile="/etc/dconf/profile/user2"
-            echo -e " - creating dconf database profile" {
+            echo -e " - creating dconf database profile"
+            {
                 echo -e "\nuser-db:user"
                 echo "system-db:$l_gpname"
             } >> "$l_gpfile"
