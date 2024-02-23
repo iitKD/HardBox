@@ -1,73 +1,106 @@
-#!/usr/bin/env python
-
+import subprocess
 import os
-def patternCheck(directory,pattern,something):
-    if not directory:
-            print(f" idle-delay is not set, so it cannot be locked\n - Please follow Recommendation \"Ensure GDM screen locks when the user is idle\" and follow this Recommendation again")
+def uninstallservices( toUninstall,Sname):
+    print(f"Checking {Sname}...")
+    cmd = f"dpkg-query -W -f='${{binary:Package}}\t${{Status}}\t${{db:Status-Status}}\n' {toUninstall}"
+    isinstalled = subprocess.run(cmd,shell=True,text=True,capture_output=True)
+    install_status =[]
+    for line in isinstalled.stdout.splitlines():
+        install_status.append(line.split("\t")[1].split()[2].lower())
+    if "installed" in install_status:
+        print(f"{Sname} is installed, removing {Sname}...")
+        uninstalled= subprocess.run(["apt","purge",f"{toUninstall}","-y"],stdout=subprocess.DEVNULL)
+        if uninstalled.returncode==0:
+            print(f"{Sname} is removed form system")
+            print("-"*64)
+            return
+        else:
+            print(f"{Sname} was not removed ")
+            print("-"*64)
+            return
     else:
-        for root,dirs, files in os.walk(directory):
-            for file in files:
-                path = os.path.join(root,file)
-                try:
-                    for line in open(path,"r").readlines():
-                        if pattern in line:
-                                print(f" \"ideal-delay\" is locked in {path} ")
-                                return
-                except:
-                    continue
-        print(f"Creating entry to lock idel-delay")
-        path = os.path.join(directory, 'locks', '00-screensaver')
-        os.makedirs(os.path.join(directory, 'locks'), exist_ok=True)
-        with open(path, 'w') as lockFile:
-            lockFile.write(f"\n# Lock desktop screensaver {something}-delay setting\n{pattern}")
-
-def screenLockFile():
-    packageInstalled = ""
-    if os.system("command -v dpkg-query > /dev/null 2>&1") == 0:
-        packageManager = "dpkg-query -W"
-    elif os.system("command -v rpm > /dev/null 2>&1") == 0:
-        packageManager = "rpm -q"
-    else:
+        print(f"{Sname} is not installed")
+        print("-"*64)
         return
 
-    packageList = ["gdm", "gdm3"]
-    for package in packageList:
-        if os.system(f"{packageManager} {package} > /dev/null 2>&1") == 0:
-            packageInstalled += f"\n - Package: \"{package}\" exists on the system\n - Remediating configuration if needed"
-    if packageInstalled:
-        print(packageInstalled)
 
-        # Look for idle-delay to determine profile in use, needed for remaining tests
-        directoryPath = "/etc/dconf/db/"
+def removeXserver():
+    cmdX = "dpkg-query -W -f='${binary:Package}\\t${Status}\\t${db:Status-Status}\\n' xserver-xorg*"
+    Xinstalled = subprocess.run(cmdX, shell=True, text=True, capture_output=True)
+    install_status = []
+    for line in Xinstalled.stdout.splitlines():
+        install_status.append(line.split("\t")[1].split()[2])
+    if "installed" in install_status:
+        print(" Removing xserver-xorg packages" )
+        Xuninstall = subprocess.run(["apt", "purge", "xserver-xorg*", "-y"],stdout=subprocess.DEVNULL)
+        if Xuninstall.returncode==0:
+            print("Xserver-xorg packages are removed")
+            print("-"*64)
+        else:
+            print("Xserver-xorg packages are removed")
+            print("-"*64)
 
-        keyfileDirectoryidle = None
-        keyfileDirectorylock = None
-        settingIdle = "idle-delay = uint32"
-        settingLock = "lock-delay = uint32"
-        idledelayPattern = '/org/gnome/desktop/session/idle-delay'
-        lockdelayPattern = "/org/gnome/desktop/screensaver/lock-delay"
-        for root, dirs, files in os.walk(directoryPath):
-            for file in files:
-                    filepath = os.path.join(root,file)
-                    try:
-                        for line in open(filepath,"r").readlines():
-                            if settingIdle in line:
-                                keyfileDirectoryidle = root
-                                break
-                    except:
-                        continue
-        for root, dirs, files in os.walk(directoryPath):
-            for file in files:
-                    filepath = os.path.join(root,file)
-                    try:
-                        for line in open(filepath,"r").readlines():
-                            if settingLock in line:
-                                keyfileDirectorylock = root
-                                break
-                    except:
-                        continue
-        patternCheck(keyfileDirectoryidle,idledelayPattern,"idle")
-        patternCheck(keyfileDirectorylock,lockdelayPattern,"lock")
-        os.system("dconf update")
+
     else:
-        print(" - GNOME Desktop Manager package is not installed on the system\n - Recommendation is not applicable")
+        print("xserver-xorg packages are not installed")
+        print("-"*64)
+
+def removeAvahi():
+    cmdavahi = "dpkg-query -W -f='${binary:Package}\t${Status}\t${db:Status-Status}\n' avahi-daemon"
+    avahiinstalled = subprocess.run(cmdavahi,shell=True, text=True, capture_output=True)
+    install_status = []
+    for line in avahiinstalled.stdout.splitlines():
+        install_status.append(line.split("\t")[1].split()[2])
+    if "installed" in install_status:
+        print("avahi-daemon is installed, removing it...")
+        
+        subprocess.run(["systemctl","stop","avahi-daaemon.service", "-y"],stdout=subprocess.DEVNULL)
+        subprocess.run(["systemctl","stop","avahi-daemon.socket","-y"],stdout=subprocess.DEVNULL)
+        subprocess.run(["apt","purge","avahi-daemon","-y"],stdout=subprocess.DEVNULL)
+    else:
+        print("Avahi package is not installed")
+
+
+removeXserver()
+removeAvahi()
+uninstallservices("cups","CUPS")
+
+uninstallservices("isc-dhcp-server","DHCP")
+
+uninstallservices("sldap","LDAP")
+
+uninstallservices("nfs-kernel-server","NFS")
+uninstallservices("bind9","DNS")
+uninstallservices("vsftpd","FTP")
+uninstallservices("apache2", "HTTP server")
+uninstallservices("dovecot-imapd", "IMAP")
+uninstallservices("dovecot-pop3d", "POP3")
+uninstallservices("samba","Server Message Block(SMB) daemon")
+uninstallservices("squid","HTTP Proxy Server")
+uninstallservices("snmp", "Simple Network Management Protocol (SNMP)")
+uninstallservices("nis", "Network Information System (NIS)")
+uninstallservices("rsync","rsync")
+uninstallservices("rsh-client","RSH packages")
+uninstallservices("talk","Talk")
+uninstallservices("telnet","Telnet")
+uninstallservices("ldap-utils","LDAP clients")
+uninstallservices("rpcbind","Remote Procedure Call (RPC)")
+
+
+def localonlyMTA():
+    if os.path.isfile("/etc/postfix/main.conf"):
+        with open("/etc/postfix.main.conf","r") as postfixFile:
+                lines = postfixFile.readlines()
+        for i in range(len(lines)):
+            if "inet_interfaces = " in lines[i]:
+                if "inet_interfaces = loopback-only" in lines[i]:
+                    print("postfix MTA is not listining on any non-loopback addresses")
+                    break
+                else:
+                    lines[i] = f"inet_interfaces = loopback-only\n"
+                    break
+        with open("/etc/postfix.main.conf", "w") as file:
+            file.writelines(lines)
+
+    else:
+        print("Postfix MTA is not enabled")
