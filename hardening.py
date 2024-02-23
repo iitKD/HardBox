@@ -216,7 +216,7 @@ def coreDumpRestriction():
             sysctlFile.write("fs.suid_dumpable = 0\n")
         subprocess.run(["sysctl","-w","fs.suid_dumpable=0"])
 
-
+"""
     coreDumpPath = "/etc/systemd/coredump.conf"
     storage_modified = False
     process_size_max_modified = False
@@ -244,7 +244,7 @@ def coreDumpRestriction():
         subprocess.run(["systemctl", "daemon-reload"])
     else:
         print("Core dump size is restricted to 0 Byte!")
-
+"""
     
 def configureApparmor():
     result = subprocess.run(["dpkg","-s", "apparmor"],stdout=subprocess.DEVNULL)
