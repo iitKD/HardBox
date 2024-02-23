@@ -282,7 +282,7 @@ def configureApparmor():
 
 
 def cmdLineBanners():
-    cmdMsg = "Authorized uses only. All activity may be monitored and reported."
+    cmdMsg = "Authorized uses only. All activity may be monitored and reported.\n"
     with open("/etc/issue", "r") as cmdFile:
         if cmdMsg not in cmdFile.read():
             print("Setting Command line banner..")
@@ -442,10 +442,11 @@ def patternCheckScreen(directory,pattern,something):
         path = os.path.join(directory, 'locks', '00-screensaver')
         if os.path.isfile(path):
             with open(path, 'a') as lockFile:
-                lockFile.write(f"\n# Lock desktop screensaver {something}-delay setting\n{pattern}")
-        os.makedirs(os.path.join(directory, 'locks'), exist_ok=True)
-        with open(path, 'w') as lockFile:
-            lockFile.write(f"\n# Lock desktop screensaver {something}-delay setting\n{pattern}")
+                lockFile.write(f"\n# Lock desktop screensaver {something}-delay setting\n{pattern}\n")
+        else:
+            os.makedirs(os.path.join(directory, 'locks'), exist_ok=True)
+            with open(path, 'w') as lockFile:
+                lockFile.write(f"\n# Lock desktop screensaver {something}-delay setting\n{pattern}\n")
 
 def screenLockFile():
     packageInstalled = ""
