@@ -36,20 +36,25 @@ def disable_filesystem_loading():
 
 #disabling automounting of file systems
 def disable_autofs():
-    depRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
-    rdepRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
+    result = subprocess.run(["dpkg","-s","autofs"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    if result.returncode==0:
+        print("autofs installed chekcing dependencies...")
+        depRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
+        rdepRes = subprocess.run(["apt-cache", "depends", "autofs"], capture_output=True, text=True)
 
-    if "Depnds" in depRes.stdout or "Reverse Depends" in rdepRes.stdout:
-        print("Dependencies found for autofs, so masking and stopping the module..")
-        subprocess.run(["system", "stop", "autofs"])
-        subprocess.run(["system", "mask", "autofs"])
+        if "Depnds" in depRes.stdout or "Reverse Depends" in rdepRes.stdout:
+            print("Dependencies found for autofs, so masking and stopping the module..")
+            subprocess.run(["system", "stop", "autofs"])
+            subprocess.run(["system", "mask", "autofs"])
+        else:
+            print("No dependencies found, uninstalling  autofs")
+            subprocess.run(["apt", "purge", "autofs"])
     else:
-        print("No dependencies found, uninstalling  autofs")
-        subprocess.run(["apt", "purge", "autofs"])
+        print("autofs not installed, no action required!")
 
 
 def installingAIDE():
-    is_installed = subprocess.run(["dpkg", "-s", "aide"], stdout=subprocess.DEVNULL)
+    is_installed = subprocess.run(["dpkg", "-s", "aide"], stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     if is_installed.returncode == 0:
         print("AIDE is already installed.")
     else:
@@ -106,28 +111,29 @@ WantedBy=multi-user.target
     subprocess.run("systemctl --now enable aidecheck.timer", shell=True)
 
 def bootloaderPassword():
-    print("Setting bootloader password...")
-    password = getpass.getpass("Enter password for your bootloader: ")
-    password_confirm = getpass.getpass("Re-enter password: ")
-    if password != password_confirm:
-        print("Passwords do not match. Please try again.")
-        bootloaderPassword()
-    else:
-        command = ["grub-mkpasswd-pbkdf2"]
-        result = subprocess.run(command, input=f"{password}\n{password_confirm}\n", capture_output=True, text=True)
-
-        if result.returncode == 0:
-            conf_content = f"""cat <<EOF 
-            set superusers="bootloader" 
-            password_pbkdf2 bootloader {result.stdout[68:]}
-            EOF
-            """
-            with open("/etc/grub.d/CIS","w") as configFile:
-                configFile.write(conf_content)
-            print("Bootloader password is set")
+    if not os.path.exit("/etc/grub.d/CIS"):
+        print("Setting bootloader password...")
+        password = getpass.getpass("Enter password for your bootloader: ")
+        password_confirm = getpass.getpass("Re-enter password: ")
+        if password != password_confirm:
+            print("Passwords do not match. Please try again.")
+            bootloaderPassword()
         else:
-            print("Error , password could not be set, try manually!")
-            print(result.stderr)
+            command = ["grub-mkpasswd-pbkdf2"]
+            result = subprocess.run(command, input=f"{password}\n{password_confirm}\n", capture_output=True, text=True)
+
+            if result.returncode == 0:
+                conf_content = f"""cat <<EOF 
+                set superusers="bootloader" 
+                password_pbkdf2 bootloader {result.stdout[68:]}
+                EOF
+                """
+                with open("/etc/grub.d/CIS","w") as configFile:
+                    configFile.write(conf_content)
+                print("Bootloader password is set")
+            else:
+                print("Error , password could not be set, try manually!")
+                print(result.stderr)
 
 def bootconfigPermission():
      print("Restricting permissions on bootloader config files")
@@ -253,11 +259,11 @@ def configureApparmor():
         if os.path.exists("/usr/sbin/aa-enforce"):
             print("apparmor utils are avilable")
         else:
-            subprocess.run(["apt","install", "apparmor-utils"],stdout=subprocess.DEVNULL)
+            subprocess.run(["apt","install", "apparmor-utils","-y"],stdout=subprocess.DEVNULL)
     else:
         print("installing Apparmor...")
-        subprocess.run(["apt", "install","apparmor"],stdout=subprocess.DEVNULL)
-        subprocess.run(["apt", "install","apparmor-utils"],stdout=subprocess.DEVNULL)
+        subprocess.run(["apt", "install","apparmor","-y"],stdout=subprocess.DEVNULL)
+        subprocess.run(["apt", "install","apparmor-utils","-y"],stdout=subprocess.DEVNULL)
 
     apparmorPath = "/etc/default/grub"
     with open(apparmorPath,"r") as apparmorFile:
@@ -415,7 +421,7 @@ def screenLockIdle():
     keyfilepath = "/etc/dconf/db/gdm.d/00-screensaver"
     idleTime = "900"
     lockTime = "5"
-    keyfileContent = f"""# Specify the dconf path\n[org/gnome/desktop/session]\n\n# Number of seconds of inactivity before the screen goes blank\n# Set to 0 seconds if you want to deactivate the screensaver.\nidle-delay = uint32 {idleTime}\n\n# Specify the dconf path\n[org/gnome/desktop/screensaver]\n\n# Number of seconds after the screen is blank before locking the screen\nlock-delay = unit32 {lockTime}\n"""
+    keyfileContent = f"""# Specify the dconf path\n[org/gnome/desktop/session]\n\n# Number of seconds of inactivity before the screen goes blank\n# Set to 0 seconds if you want to deactivate the screensaver.\nidle-delay = uint32 {idleTime}\n\n# Specify the dconf path\n[org/gnome/desktop/screensaver]\n\n# Number of seconds after the screen is blank before locking the screen\nlock-delay = uint32 {lockTime}\n"""
     
     if not os.path.exists(keyfilepath) or keyfileContent != open(keyfilepath).read():
         print("Creating/updating config file for Idle screen time and Lock time")
