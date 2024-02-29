@@ -16,14 +16,19 @@ def disable_filesystem_loading():
                     with open(modprobe_conf_path, 'a') as f:
                         print(f" - setting module: \"{l_mname}\" to be not loadable")
                         f.write(install_line)
+                    
+                    print(f" - unloading module \"{l_mname}\"")
+                    subprocess.run(["modprobe", "-r", l_mname])
                 else:
                     print(f"{l_mname} is set to be not loadable")
         except FileNotFoundError:
             with open(modprobe_conf_path, 'w') as f:
                 print(f" - setting module: \"{l_mname}\" to be not loadable")
                 f.write(install_line)
-        print(f" - unloading module \"{l_mname}\"")
-        subprocess.run(["modprobe", "-r", l_mname])
+        
+            print(f" - unloading module \"{l_mname}\"")
+            subprocess.run(["modprobe", "-r", l_mname])
+        
 
         blacklist_line = f"blacklist {l_mname}\n"
         with open(modprobe_conf_path, 'r') as f:
