@@ -111,7 +111,7 @@ WantedBy=multi-user.target
     subprocess.run("systemctl --now enable aidecheck.timer", shell=True)
 
 def bootloaderPassword():
-    if not os.path.exit("/etc/grub.d/CIS"):
+    if not os.path.exists("/etc/grub.d/CIS"):
         print("Setting bootloader password...")
         password = getpass.getpass("Enter password for your bootloader: ")
         password_confirm = getpass.getpass("Re-enter password: ")
@@ -134,6 +134,8 @@ def bootloaderPassword():
             else:
                 print("Error , password could not be set, try manually!")
                 print(result.stderr)
+    else:
+        print("Bootloader password is already set!")
 
 def bootconfigPermission():
      print("Restricting permissions on bootloader config files")
