@@ -278,7 +278,8 @@ def configureApparmor():
         apparmorLines = apparmorFile.readline()
     apparmor_flag = False
     for line in apparmorLines:
-        if line ==  """GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor"\n""":
+        if line ==  """
+\n""":
             apparmor_flag=True
             break
 
@@ -795,7 +796,6 @@ def removePackages():
                 print("Xserver-xorg packages are removed")
                 print("-"*64)
 
-
         else:
             print("xserver-xorg packages are not installed")
             print("-"*64)
@@ -852,11 +852,10 @@ def localonlyMTA():
                     break
         with open("/etc/postfix.main.conf", "w") as file:
             file.writelines(lines)
-
     else:
         print("Postfix MTA is not enabled")
 
-def disableNetworkinterfaces():
+def disableWirelessinterfaces():
     wirelessResult = subprocess.run(["nmcli", "radio", "all"],text=True,capture_output=True)
     wirePattern = r'\s+\S+\s+disabled\s+\S+\s+disabled\s+'
     match  = re.search(wirePattern,wirelessResult.stdout)
@@ -881,7 +880,7 @@ def ipv6isEnabled():
                     if re.search(r"^\s*(kernelopts=|linux|kernel)", line):
                         if re.search(r"ipv6\.disable=1", line):
                             return f"IPv6 Disabled in \"/boot/{grub_file}\""
-        return None
+        return True
 
 
     def check_sysctl_config():
@@ -913,17 +912,20 @@ def ipv6isEnabled():
             if re.search(r"^\s*net\.ipv6\.conf\.all\.disable_ipv6\s*=\s*1\s*$", output_all) \
                 and re.search(r"^\s*net\.ipv6\.conf\.default\.disable_ipv6\s*=\s*1\s*$", output_default):
                 return "ipv6 disabled in sysctl config"
-        return None
+        return True
     
     message_grub = check_grub_config()
     message_sysctl = check_sysctl_config()
 
-    if message_grub:
+    if message_grub != True:
         print(f"\nIPv6 Disabled: {message_grub}")
-    elif message_sysctl:
+        return False
+    elif message_sysctl != True:
         print(f"\n{message_sysctl}")
+        return False
     else:
         print("\nIPv6 is enabled on the system")
+        return True
 
 def settingnetworkParameters():
     filePath = "/etc/default/ufw"
@@ -943,7 +945,7 @@ def settingnetworkParameters():
                     ufwFile.write(line)
 
     def KernelparaFun(paraName, paraValue,newkernelFile):
-        print("Checking for coreect Kernel parameter set in Files")
+        print("Checking for correct Network parameter set in Files")
         for loc in searchLoc:
             if os.path.isfile(loc):
                 with open(loc,"r") as kernelFile:
@@ -952,13 +954,13 @@ def settingnetworkParameters():
                     if kernelLines[i].strip().startswith(paraName):
                         value = kernelLines[i].split("=")[1].strip()
                         if value != paraValue:
-                            print(f"Commenting out {paraName} in {loc}")
+                            print(f"\t-Commenting out {paraName} in {loc}")
                             kernelLines[i] = f"#{kernelLines[i]}\n"
                         else:
                             print(f'{paraName} set correctly in {loc}')
                     else:
                         if kernelLines[i].strip().startswith(f"#{paraName}") or kernelLines[i].strip().startswith(f"# {paraName}"):
-                            print(f"{paraName} already commented out in {loc}")
+                            print(f"\t-{paraName} already commented out in {loc}")
                 with open(loc,"w") as kernelFile:
                     kernelFile.writelines(kernelLines)
             else:
@@ -972,17 +974,17 @@ def settingnetworkParameters():
                                 if kernelLines[i].strip().startswith(paraName):
                                     value = kernelLines[i].split("=")[1].strip()
                                     if value != paraValue:
-                                        print(f"Commenting out {paraName} in {paraPath}")
+                                        print(f"\t-Commenting out {paraName} in {paraPath}")
                                         kernelLines[i] = f"#{kernelLines[i]}\n"
                                     else:
-                                        print(f'{paraName} set correctly in {paraPath}')
+                                        print(f'\t-{paraName} set correctly in {paraPath}')
                                 else:
                                     if kernelLines[i].strip().startswith(f"#{paraName}") or kernelLines[i].strip().startswith(f"# {paraName}"):
-                                        print(f"{paraName} already commented out in {paraPath}")
+                                        print(f"\t-{paraName} already commented out in {paraPath}")
                             with open(paraPath,"w") as kernelFile:
                                 kernelFile.writelines(kernelLines)
         print("Done")
-        print("Checking for correct parameter in kernel parameter files")
+        print("Checking for correct network parameter in kernel parameter files")
         pattern = r"^\s*" + re.escape(paraName) + r"\s*=\s*" + re.escape(paraValue) + r"\b\s*(#.*)?$"
         found_match = False
         for loc in searchLoc:
@@ -991,7 +993,7 @@ def settingnetworkParameters():
                     for line in f:
                         if re.search(pattern, line):
                             found_match = True
-                            print(f"{paraName} is set to {paraValue} in {loc}")
+                            print(f"\t-{paraName} is set to {paraValue} in {loc}")
                             break
             else:
                 if os.path.isdir(loc):
@@ -1002,25 +1004,25 @@ def settingnetworkParameters():
                                 for line in fl:
                                     if re.search(pattern,line):
                                         found_match = True
-                                        print(f"{paraName} is set to {paraValue} in {fpath}")
+                                        print(f"\t-{paraName} is set to {paraValue} in {fpath}")
                                         break
 
         if not found_match:
-            print(f"\n - Setting \"{paraName}\" to \"{paraValue}\" in \"{newkernelFile}\"")
+            print(f"\t\n - Setting \"{paraName}\" to \"{paraValue}\" in \"{newkernelFile}\"")
             with open(newkernelFile, 'a') as f:
                 f.write(f"{paraName} = {paraValue}\n")
-        print("Done")
-        print("checking for active kernel parameters")
+        print("\t-Done!")
+        print("Checking for active kernel parameters")
 
         sysctl_output = subprocess.run(["sysctl", paraName], capture_output=True, text=True).stdout
         paraOutput = sysctl_output.split("=")[1].strip()
         if paraOutput == paraValue:
-            print(f"{paraName} is set to {paraValue} is active kernel parameters")
+            print(f"\t-{paraName} is set to {paraValue} is active kernel parameters")
         else:
-            print(f"Updating {paraName} to {paraValue} in active kernel parameters!")
+            print(f"\t-Updating {paraName} to {paraValue} in active kernel parameters!")
             subprocess.run(["sysctl", "-w", f"{paraName}={paraValue}"])
             subprocess.run(["sysctl", "-w", f"{paraName.split('.')[0]}.{paraName.split('.')[1]}.route.flush=1"])
-        print("Done!")
+        print("\t-Done!")
         print("-"*64)
 
 
@@ -1030,13 +1032,14 @@ def settingnetworkParameters():
                 "net.ipv6.conf.default.accept_source_route=0","net.ipv4.conf.all.accept_redirects=0","net.ipv4.conf.default.accept_redirects=0",
                 "net.ipv6.conf.all.accept_redirects=0","net.ipv6.conf.default.accept_redirects=0","net.ipv4.conf.default.secure_redirects=0",
                 "net.ipv4.conf.all.secure_redirects=0","net.ipv4.conf.all.log_martians=1","net.ipv4.conf.default.log_martians=1",
-                "net.ipv4.icmp_echo_ignore_broadcasts=1","icmp_ignore_bogus_error_responses=1","net.ipv4.conf.all.rp_filter=1",
+                "net.ipv4.icmp_echo_ignore_broadcasts=1","net.ipv4.conf.all.rp_filter=1","net.ipv4.icmp_ignore_bogus_error_responses=1",
                 "net.ipv4.conf.default.rp_filter=1","net.ipv4.tcp_syncookies=1","net.ipv6.conf.all.accept_ra=0","net.ipv6.conf.default.accept_ra=0",
                 ]
     isnabled = ipv6isEnabled()
+    
     for para in paralist:
         pname,pvalue = para.split("=",1)
-        if pname.split(".")[2].strip() == "ipv6":
+        if pname.split(".")[1].strip() == "ipv6":
             if isnabled == True:
                 kFile = "/etc/sysctl.d/60-netipv6_sysctl.conf"
                 KernelparaFun(pname,pvalue,kFile)
@@ -1114,11 +1117,12 @@ def ufwConfiguration():
             print("\t-iptables-persistent not removed, need to be done manually!")
     else:
         print("\t-iptables-persistent not found, so not removed!")
+
     ufwenable = subprocess.run(["systemctl","is-enabled","ufw.service"],capture_output=True,text=True)
     ufwactive = subprocess.run(["systemctl","is-active","ufw"],capture_output=True,text=True)
     ufwstatus = subprocess.run(["ufw","status"],capture_output=True,text=True)
-    ufwstatus = ufwstatus.stdout.split(":")
-    if ufwenable.stdout=="enable" and ufwactive.stdout=="active" and ufwstatus[1].strip()=="active":
+    ufwstatus = ufwstatus.stdout.split("\n")
+    if ufwenable.stdout.strip()=="enabled" and ufwactive.stdout.strip()=="active" and ufwstatus[0].split(":")[1].strip()=="active":
         print("\t-ufw is enabled and active in the system!" )
     else:
         print("\t-ufw is not enabled, enabling it for the system...")
@@ -1133,11 +1137,11 @@ def ufwConfiguration():
     loopPattern = [r'\s+Anywhere\s+on\s+lo\s+ALLOW\sIN\s+Anywhere\s+',r'\s+Anywhere\s+DENY\sIN\s+127.0.0.0/8\s+', r'\s+Anywhere\s+\(v6\)\s+on\s+lo\s+ALLOW\sIN\s+Anywhere\s+\(v6\)'
         ,r'\s+Anywhere\s+DENY\sIN\s+::1\s+',r'\s+Anywhere\s+ALLOW\sOUT\s+Anywhere\s+on\slo\s+',r'\s+Anywhere\s\(v6\)\s+ALLOW\sOUT\s+Anywhere\s\(v6\)\son\slo\s+']
     outPattern = [r'\s+Anywhere\s+ALLOW\sOUT\s+Anywhere\s+on\sall\s+',r'\s+Anywhere\s\(v6\)\s+ALLOW\sOUT\s+Anywhere\s\(v6\)\son\sall\s+']
-    ufwstatus = ufwstatus.stdout
+
     ufwloopflag = True
     ufwoutflag = True
     for pattern in loopPattern:
-        match = re.search(pattern,ufwstatus)
+        match = re.search(pattern,ufwstatus.stdout)
         if not match:
             ufwloopflag = False
     if ufwloopflag:
@@ -1150,7 +1154,7 @@ def ufwConfiguration():
         subprocess.run(["ufw","deny","in","from","::1"],stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
         print("\tDone!")
     for pattern in outPattern:
-        match = re.search(pattern,ufwstatus)
+        match = re.search(pattern,ufwstatus.stdout)
         if not match:
             ufwoutflag = False
     if ufwoutflag:
@@ -1160,7 +1164,7 @@ def ufwConfiguration():
         subprocess.run(["ufw","allow","out","on","all"],stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
         
         print("\tDone!")
-    
+
 
     ufwOut = subprocess.run(["ufw","status","verbose"],capture_output=True,text=True)
     portOut = subprocess.run(["ss","-tuln"],capture_output=True,text=True)
@@ -1182,26 +1186,292 @@ def ufwConfiguration():
         else:
             ports.remove(port)
     if "631" in ports:
-        subprocess.run(["ufw","allow","631/tcp"])
+        subprocess.run(["ufw","allow","631/tcp"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run(["ufw","allow","out","631/tcp"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         print("\t-rule added for Port:631, for other ports the rules and configured as per requirements.")
-    
+    if "5353" in ports:
+        subprocess.run(["ufw","allow","5353/udp"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run(["ufw","allow","out","5353/udp"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        print("\t-rule added for Port:5353, for other ports the rules need to be configured as per requirements.")
     defPat = r'\s+Default:\s+deny\s+\(incoming\),\s+deny\s+\(outgoing\),\s+disabled\s+\(routed\)\s+'
-    match = re.search(defPat,ufwOut)
+    match = re.search(defPat,ufwOut.stdout)
     if match:
         print("\t-Default settings is set for ufw")
+        print("\t-Adding rules to allow http\https connections")
+        commands = [["ufw", "allow", "git"],["ufw", "allow", "in", "http"],["ufw", "allow", "out", "http"],["ufw", "allow", "in", "https"],
+                    ["ufw", "allow", "out", "https"],["ufw", "allow", "out", "53"],["ufw", "logging", "on"]]
+        for command in commands:
+            result = subprocess.run(command, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"Command {command} failed with return code {result.returncode}")
+        print("\t-Done")
     else:
         print("\t-setting Default deny ufw for all connections")
-        subprocess.run(["ufw", "allow", "git"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "allow","in", "http"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "allow","out", "http"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "allow","in", "https"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "allow","out", "https"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "allow", "out","53"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "logging", "on"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "Default", "deny","incoming"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "Default", "deny","incoming"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        subprocess.run(["ufw", "Default", "deny","routed"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        commands = [["ufw", "allow", "git"],["ufw", "allow", "in", "http"],["ufw", "allow", "out", "http"],["ufw", "allow", "in", "https"],
+                    ["ufw", "allow", "out", "https"],["ufw", "allow", "out", "53"],["ufw", "logging", "on"],["ufw", "default", "deny", "incoming"],
+                    ["ufw", "default", "deny", "routed"], ["ufw","default","deny","outgoing"]]
+        for command in commands:
+            result = subprocess.run(command, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"Command {command} failed with return code {result.returncode}")
         print("\tDone!")
+
+
+def auditConfiguration():
+    print("Checking audit related configuration in the system...")
+    auditCmd = "dpkg-query -W -f='${binary:Package}\\t${Status}\\t${db:Status-Status}\\n' auditd audispd-plugins"
+    auditinstalled = subprocess.run(auditCmd, shell=True,capture_output=True,text=True)
+    if auditinstalled.returncode==0:
+        print("\t-auditd is installed on system")
+        print("\t-audispd-plugins is installed on system")
+    else:
+        print("\t-auditd is not installed on system, installing...")
+        subprocess.run(["apt", "install","auditd","-y"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        print("\t-audispd-plugins is not installed on system, installing...")
+        subprocess.run(["apt", "install","audispd-plugins","-y"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    auditEnabled = subprocess.run(["systemctl", "is-enabled","auditd"],capture_output=True,text=True)
+    auditActive = subprocess.run(["systemctl", "is-active","auditd"],capture_output=True,text=True)
+
+    if auditEnabled.stdout.strip()=="enabled" and auditActive.stdout.strip()=="active":
+        print("\t-auditd daemon is active and enabled in the system")
+        
+    else:
+        print("\t-auditd daemon is not active or disabled in the system, enabling...")
+        subprocess.run(["systemctl","--now","enable","auditd"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+
+    cmdPrior = "find /boot -type f -name 'grub.cfg' -exec grep -Ph -- '^\h*linux' {} + | grep -v 'audit=1'"
+    auditPrior = subprocess.run(cmdPrior, capture_output=True, text=True, shell=True)
+    auditPath = "/etc/default/grub"
+    auditFlag = False
+    auditPattern = r'^GRUB_CMDLINE_LINUX=.*?\baudit=1\b.*$'
+    auditOption = "audit=1"
+    with open(auditPath, "r") as auditFile:
+        auditLines = auditFile.readlines()
+    for i in range(len(auditLines)):
+        if auditLines[i].startswith("GRUB_CMDLINE_LINUX="):
+            match = re.match(auditPattern,auditLines[i])
+            if match:
+                print(match.group())
+                auditFlag=True
+                break
+    if auditPrior.returncode==0 and auditFlag:
+        print("\t-Process started before starting auditd daemon are included in audit process")
+    else:
+        print("\t-configuring to audit process started before activating auditd daemon")
+        pattern = r'GRUB_CMDLINE_LINUX="([^"]*)"'
+        for i, line in enumerate(auditLines):
+            match = re.match(pattern, line)
+            if match:
+                current_options = match.group(1)
+                new_line = f'GRUB_CMDLINE_LINUX="{auditOption} {current_options}"\n'
+                auditLines[i] = new_line
+                break
+        with open(auditPath, 'w') as auditFile:
+            auditFile.writelines(auditLines)
+        subprocess.run(["update-grub"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+
+    cmdBacklog = "find /boot -type f -name 'grub.cfg' -exec grep -Ph -- '^\h*linux' {} + | grep -Pv 'audit_backlog_limit=\d+\b'"
+    auditbacklog = subprocess.run(cmdBacklog,capture_output=True,text=True,shell=True)
+    backlogPath = "/etc/default/grub"
+    backlogFlag = False
+    backlogPattern = r'^GRUB_CMDLINE_LINUX=.*?\baudit_backlog_limit=8192\b.*$'
+    backlogOption = "audit_backlog_limit=8192"
+    with open(backlogPath, "r") as backlogFile:
+        backlogLines = backlogFile.readlines()
+    for i in range(len(backlogLines)):
+        if backlogLines[i].startswith("GRUB_CMDLINE_LINUX="):
+            match = re.match(backlogPattern,backlogLines[i])
+            if match:
+                print(match.group())
+                backlogFlag=True
+                break
+    if auditbacklog.returncode==0 and backlogFlag:
+        print("\t-back log limit for audit events is set")
+    else:
+        print("\t-Configuring back log limit for audit events...")
+        pattern = r'GRUB_CMDLINE_LINUX="([^"]*)"'
+        for i, line in enumerate(backlogLines):
+            match = re.match(pattern, line)
+            if match:
+                current_options = match.group(1)
+                new_line = f'GRUB_CMDLINE_LINUX="{backlogOption} {current_options}"\n'
+                backlogLines[i] = new_line
+                break
+        with open(backlogPath, 'w') as backlogFile:
+            backlogFile.writelines(backlogLines)
+        
+        subprocess.run(["update-grub"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+
+    logPath = "/etc/audit/auditd.conf"
+    sizePattern = r"^\s*max_log_file\s*=\s*\d+\b"
+    actionPattern = r'^\s*max_log_file_action\s*=\s*keep_logs\b'
+    sizeFlag = False
+    actionFlag =False
+    with open(logPath,"r") as logFile:
+        logLines = logFile.readlines()
+    for i in range(len(logLines)):
+        if logLines[i].startswith("max_log_file ="):
+            sizeMatch = re.match(sizePattern,logLines[i])
+            if sizeMatch:
+                if 8 >= int(logLines[i].split("=")[1].strip()) :
+                    print("\t-Storage size for audit log is set")
+                continue
+            else:
+                print("\t-Setting storage size for audit log files...")
+                logLines[i] ="max_log_file = 8\n"
+                sizeFlag = True
+                continue
+        if logLines[i].startswith("max_log_file_action ="):
+            actionMatch = re.match(actionPattern,logLines[i])
+            if actionMatch:
+                print("\t-System configured to not delte audit logs automatically")
+                continue
+            else:
+                print("\t-Configuring audit logs to not be deleted automatically")
+                logLines[i] = "max_log_file_action = keep_logs\n"
+                actionFlag  = True
+                continue
+    if sizeFlag or actionFlag:
+        with open(logPath,"w") as logFile:
+            logFile.writelines(logLines)
+
+
+    with open(logPath,"r") as auditconfFile:
+        auditconfLines = auditconfFile.readlines()
+    spaceAction = subprocess.run(["grep","-w","space_left_action","/etc/audit/auditd.conf"],capture_output=True,text=True)
+    adminspaceAction = subprocess.run(["grep","-w","admin_space_left_action","/etc/audit/auditd.conf"],capture_output=True,text=True)
+    spaceMail = subprocess.run(["grep","-w","action_mail_acct","/etc/audit/auditd.conf"],capture_output=True,text=True)
+    spaceAction = spaceAction.stdout.split("=")
+    spaceMail = spaceMail.stdout.split("=")
+    adminspaceAction = adminspaceAction.stdout.split("=")
+    if spaceAction[1].strip().lower() =='email' and (adminspaceAction[1].strip().lower()=="halt" or adminspaceAction[1].strip().lower()=="single") and spaceMail[1].strip().lower()=="root":
+        print("\t-System configured to be disabled when audit logs are full")
+    else:
+        print("\t-Configuring system to be disbaled when audit logs are full...")
+        if spaceAction[1].strip().lower() !='email':
+            for i in range(len(auditconfLines)):
+                if auditconfLines[i].startswith("space_left_action"):
+                    auditconfLines[i] = "space_left_action = email\n"
+        if adminspaceAction[1].strip().lower()!="halt" or adminspaceAction[1].strip().lower()!="single":
+            for i in range(len(auditconfLines)):
+                if auditconfLines[i].startswith("admin_space_left_action"):
+                    auditconfLines[i] = "admin_space_left_action = halt\n"
+        if spaceMail[1].strip().lower()!="root" :
+            for i in range(len(auditconfLines)):
+                if auditconfLines[i].startswith("action_mail_account"):
+                    auditconfLines[i] = "action_mail_account = root\n"
+        with open(logPath,"w") as auditconfFile:
+            auditconfFile.writelines(auditconfLines)
+
+def auditruleConfiguration():
+
+    def findDiskrules(pattern,path):
+        derivedRules = []
+        for root,_,files in os.walk(path):
+            for file in files:
+                if file.endswith(".rules"):
+                    filePath = os.path.join(root,file)
+                    with open(filePath,"r") as f:
+                        for line in f:
+                            if pattern.search(line):
+                                derivedRules.append(line)
+        return derivedRules
+
+    def findRunningRules(pattern):
+        runRules = subprocess.run(["auditctl", "-l"], capture_output=True, text=True)
+        rules_found = []
+        for line in runRules.stdout.splitlines():
+            if re.search(pattern,line):
+                rules_found.append(line)
+        return rules_found
+        
+    rulePath = "/etc/audit/rules.d/"
+    #<----------------------------Sudoer rule----------------------------->
+    print("Checking for logging of change in sudoer scope...")
+    sudoerRulePath = "/etc/audit/rules.d/50-scope.rules"
+    sudoerRule = ["-w /etc/sudoers -p wa -k scope","-w /etc/sudoers.d -p wa -k scope"]
+    sudoerPattern = re.compile(r'^ *-w.*?/etc/sudoers.*? +-p *wa.*?( key= *[!-~]* *$|-k *[!-~]* *$)')
+    sudoerDRfound = findDiskrules(sudoerPattern,rulePath)
+    sudoerRRfound = findRunningRules(sudoerPattern)
+    if len(sudoerRule)!=len(sudoerDRfound) or len(sudoerRule)!=len(sudoerRRfound):
+        print("\t-Rule for monitoring Scope chages for sudoer is not added, adding")
+        if os.path.isfile(sudoerRulePath):
+            with open(sudoerRulePath,"a") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in sudoerRule)
+        else:
+            with open(sudoerRulePath,"w") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in sudoerRule)
+        ruleupdate = subprocess.run(["augenrules","--load"],capture_output=True,text=True)
+        if ruleupdate.returncode==0:
+            print("\t-Rules added successfully")
+        else:
+            print("\t-Error in updating the rules , need to be checked manually")
+    else:
+        print("\t-System configured to monitor change in scope of Sudoer!")
+    #<--------------------------------Other User activity Rule------------------------->
+    print("Checking for logging of other user activities...")
+    otherUsrRulePath = "/etc/audit/rules.d/50-user_emulation.rules"
+    otherUsrRule = ["-a always,exit -F arch=b64 -C euid!=uid -F auid!=unset -S execve -k user_emulation","-a always,exit -F arch=b32 -C euid!=uid -F auid!=unset -S execve -k user_emulation"]
+    otherUsrPattern =  re.compile(
+        r'^\s*-a\s+always,exit'            
+        r'(?:\s+-F\s+arch=b[2346]{2})'     
+        r'(?:\s+-F\s+auid!=(?:unset|-1|4294967295))?'
+        r'(?:\s+-C\s+euid!=uid|\s+-C\s+uid!=euid)?'  
+        r'.*?'                                    
+        r'(\s+-S\s+execve)'                      
+        r'.*?'           
+        r'(\s+(?:key=|-k)\s*[!-~]+)$',
+        re.IGNORECASE
+    )
+    otherUsrDRfound = findDiskrules(otherUsrPattern,rulePath)
+    otherUsrRRfound = findRunningRules(otherUsrPattern)
+    if len(otherUsrRule)!=len(otherUsrDRfound) or len(otherUsrRule)!=len(otherUsrRRfound):
+        print("\t-Rule logging other user activities are not added, adding...")
+        if os.path.isfile(otherUsrRulePath):
+            with open(otherUsrRulePath,"a") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in otherUsrRule)
+        else:
+            with open(otherUsrRulePath,"w") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in otherUsrRule)
+
+        ruleupdate = subprocess.run(["augenrules","--load"],capture_output=True,text=True)
+        if ruleupdate.returncode==0:
+            print("\t-Rules added successfully")
+        else:
+            print("\t-Error in updating the rules , need to be checked manually")
+    else:
+        print("\t-System configured to monitor activities of other user!")
+    #<------------Sudo log file modifiction------------------------------------------->
+    print("Checking for logging activated for changes to date and time information...")
+    timeDateRulePath = "/etc/audit/rules.d/50-time-change.rules"
+    timeDateRule = ["-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change",
+                    "-a always,exit -F arch=b32 -S adjtimex,settimeofday,clock_settime -k time-change" ,
+                    "-w /etc/localtime -p wa -k time-change"]
+    timeDatePattern1 = re.compile(r'^ *-a *always,exit.*-F *arch=b[2346]{2}.*-S.*?(adjtimex|settimeofday|clock_settime).*?(key= *[!-~]* *$|-k *[!-~]* *$)')
+    timeDatePattern2 = re.compile(r'^ *-w.*?/etc/localtime.*-p *wa.*?(key= *[!-~]* *$|-k *[!-~]* *$)')
+
+    timeDateDRfound1 = findDiskrules(timeDatePattern1,rulePath)
+    timeDateRRfound1 = findRunningRules(timeDatePattern1)
+    timeDateDRfound2 = findDiskrules(timeDatePattern2,rulePath)
+    timeDateRRfound2 = findRunningRules(timeDatePattern2)
+    timeDateDRfound = timeDateDRfound1+timeDateDRfound2
+    timeDateRRfound = timeDateRRfound1 + timeDateRRfound2
+    if len(timeDateRule)!=len(timeDateDRfound) or len(timeDateRule)!=len(timeDateRRfound):
+        print("\t-Rule for monitoring changes in Date and Time information, adding...")
+        if os.path.isfile(timeDateRulePath):
+            with open(timeDateRulePath,"a") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in timeDateRule)
+        else:
+            with open(timeDateRulePath,"w") as rFile :
+                rFile.writelines(f"{rule}\n" for rule in timeDateRule)
+
+        ruleupdate = subprocess.run(["augenrules","--load"],capture_output=True,text=True)
+        if ruleupdate.returncode==0:
+            print("\t-Rules added successfully")
+        else:
+            print("\t-Error in updating the rules , need to be checked manually")
+    else:
+        print("\t-System configured to monitor change Date and Time information!")
 
 
 print("-"*64)
@@ -1249,6 +1519,14 @@ removePackages()
 print("-"*64)
 localonlyMTA()
 print("-"*64)
-
-
-
+disableWirelessinterfaces()
+print("-"*64)
+settingnetworkParameters()
+print("-"*64)
+disableNetworkmodule()
+print("-"*64)
+ufwConfiguration()
+print("-"*64)
+auditConfiguration()
+print("-"*64)
+auditruleConfiguration()
