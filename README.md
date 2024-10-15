@@ -1,7 +1,3 @@
-Here's the updated README reflecting the name "HardBox" and the `hardening.py` file:
-
----
-
 # HardBox: Linux System Hardening Tool
 
 ## Overview
